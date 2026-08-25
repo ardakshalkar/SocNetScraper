@@ -1,6 +1,6 @@
 {
   "name": "narxoz-threads",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Scrape and summarize public Threads posts about Narxoz University.",
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",

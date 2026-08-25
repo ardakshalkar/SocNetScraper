@@ -60,29 +60,47 @@ Pick one:
 3. **Keep a process running** — `python -m socnetscraper daily --now`
 4. **Linux/macOS cron** — `0 9 * * * cd /path/to/SocNetScraper && .venv/bin/python -m socnetscraper scrape`
 
-## Include in Claude or Codex
+## Claude Code plugin (one install, no Python)
 
-TypeScript plugins live in `plugins/`. The **Claude plugin does not need Python**; it scrapes with Node and Playwright.
-
-```bash
-cd plugins/mcp && npm install && npx playwright install chromium && npm run build
-cd ../claude && npm install
-```
-
-See `plugins/README.md`.
-
-**Claude Code plugin**
+Node 18+ on PATH is the only prerequisite. Everything else — Playwright, Chromium, the
+data directory, a default `config.json` — the plugin sets up by itself.
 
 ```text
 /plugin marketplace add ardakshalkar/SocNetScraper
 /plugin install narxoz-threads@narxoz-threads-marketplace
 ```
 
-This repo also still has `CLAUDE.md` and `.claude/skills/scrape-threads-narxoz/SKILL.md` if you open the project without installing the plugin.
+Then just ask for Narxoz mentions, or use the commands:
+
+| Command | Does |
+| --- | --- |
+| `/narxoz-threads:scrape` | Collect new posts, summarise the last 7 days |
+| `/narxoz-threads:report` | Summarise what is already saved, without scraping |
+| `/narxoz-threads:setup` | Check the install, save a Threads login session |
+
+**Where data goes.** A standalone install writes to `~/.narxoz-threads`
+(`posts.jsonl`, `posts.csv`, `config.json`, the browser session). Opened inside this repo,
+it uses the repo's `data/` instead. Set `NARXOZ_SCRAPER_ROOT` to override either.
+
+**Credentials** are only needed when Threads shows a login wall. Put them in a `.env` next
+to the data root — `~/.narxoz-threads/.env` — or export `THREADS_USERNAME` /
+`THREADS_PASSWORD` / `THREADS_ACCESS_TOKEN` in your shell before starting Claude. Run
+`/narxoz-threads:setup` to see exactly which file is being read.
+
+The first scrape on a new machine takes a few minutes while Chromium downloads.
 
 **Codex plugin**
 
-Install `plugins/codex` (it has `.codex-plugin/plugin.json`). Node 18+ must be on PATH.
+Install `plugins/codex` (it has `.codex-plugin/plugin.json`). Same self-install behaviour,
+same Node 18+ requirement.
+
+**Developing the plugin.** Only needed if you change the TypeScript in `plugins/mcp/src`:
+
+```bash
+cd plugins/mcp && npm install && npm run build
+```
+
+That rebuilds the bundled `server/index.js` for both plugins. See `plugins/README.md`.
 
 **Claude Desktop MCP (Node, no Python)**
 
@@ -105,6 +123,7 @@ Tools Claude gets:
 - `scrape_narxoz_threads`
 - `login_narxoz_threads`
 - `latest_narxoz_threads`
+- `narxoz_threads_status`
 - `narxoz_threads_data_path`
 
 ## Official API vs browser

@@ -1,6 +1,6 @@
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { scraperRoot } from "../repo.js";
+import { homeRoot, scraperRoot } from "../repo.js";
 
 export type AppConfig = {
   keywords: string[];
@@ -28,8 +28,23 @@ const DEFAULTS: AppConfig = {
   search_filters: ["recent", "default"],
 };
 
+/** `.env` files read in order; the first non-empty value for a key wins. */
+export function envFiles(root: string): string[] {
+  const files = [join(root, ".env")];
+  const home = join(homeRoot(), ".env");
+  if (!files.includes(home)) {
+    files.push(home);
+  }
+  return files;
+}
+
 export function loadDotEnv(root: string): void {
-  const file = join(root, ".env");
+  for (const file of envFiles(root)) {
+    readDotEnvFile(file);
+  }
+}
+
+function readDotEnvFile(file: string): void {
   if (!existsSync(file)) {
     return;
   }
@@ -50,7 +65,9 @@ export function loadDotEnv(root: string): void {
     ) {
       value = value.slice(1, -1);
     }
-    if (!(key in process.env)) {
+    // An empty value counts as unset: the plugin passes through blank
+    // placeholders like ${THREADS_USERNAME:-} when the shell has no such var.
+    if (!process.env[key]?.trim()) {
       process.env[key] = value;
     }
   }
@@ -79,6 +96,9 @@ export function loadConfig(root = scraperRoot()): AppConfig {
   const file = paths(root).config;
   if (existsSync(file)) {
     Object.assign(cfg, JSON.parse(readFileSync(file, "utf8")) as Partial<AppConfig>);
+  } else {
+    // First run of a standalone install: leave an editable copy of the defaults.
+    writeFileSync(file, JSON.stringify(DEFAULTS, null, 2) + "\n", "utf8");
   }
   return cfg;
 }

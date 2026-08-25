@@ -1,8 +1,8 @@
 {
   "name": "narxoz-threads",
   "displayName": "Narxoz Threads",
-  "version": "0.2.0",
-  "description": "Scrape public Threads posts about Narxoz with Node and Playwright (no Python).",
+  "version": "0.3.0",
+  "description": "Scrape public Threads posts about Narxoz with Node and Playwright. Installs its own dependencies — no Python, no manual setup.",
   "author": {
     "name": "Ardak Shalkar",
     "url": "https://github.com/ardakshalkar"
@@ -10,5 +10,9 @@
   "homepage": "https://github.com/ardakshalkar/SocNetScraper",
   "repository": "https://github.com/ardakshalkar/SocNetScraper",
   "license": "MIT",
-  "keywords": ["threads", "narxoz", "social-listening"]
+  "keywords": ["threads", "narxoz", "social-listening", "scraper"],
+  "commands": "./commands",
+  "skills": "./skills",
+  "hooks": "./hooks/hooks.json",
+  "mcpServers": "./.mcp.json"
 }

@@ -1,34 +1,47 @@
 ---
 name: scrape-threads-narxoz
-description: Scrapes public Threads posts about Narxoz University with the TypeScript MCP tools (no Python). Use when the user asks for Threads mentions of нархоз or narxoz, a daily Narxoz social listening run, or to summarize collected Threads posts.
+description: Scrapes public Threads posts about Narxoz University with the TypeScript plugin (no Python). Use when the user asks for Threads mentions of нархоз or narxoz, a daily Narxoz social listening run, or to summarize collected Threads posts.
 ---
 
 # Scrape Threads for Narxoz
 
-Collect public Threads posts that mention **нархоз** or **narxoz**. Use this repo's MCP tools. Do **not** call Python. Do not invent a second scraper.
+Use this plugin's MCP tools. Do **not** call Python and do **not** write a second scraper.
 
 ## Tools
 
 - `scrape_narxoz_threads` — collect posts (`browser: true` skips the official API)
-- `login_narxoz_threads` — save a Threads session from `.env` (`THREADS_USERNAME` / `THREADS_PASSWORD`)
-- `latest_narxoz_threads` — read saved posts (`hours: 168` or `24`)
-- `narxoz_threads_data_path` — path to `data/posts.jsonl`
+- `latest_narxoz_threads` — read saved posts (`hours: 168` for a week, `24` for a day, `0` for everything)
+- `login_narxoz_threads` — open a browser and save a Threads session
+- `narxoz_threads_status` — data root, credentials found, install health
+- `narxoz_threads_data_path` — path to `posts.jsonl`
 
-If MCP is not connected, tell the user to install Node 18+, then:
+## Setup
 
-```bash
-cd plugins/mcp && npm install && npm run build
-cd ../claude && npm install
+Nothing to install. The plugin installs Node Playwright and Chromium by itself on first
+use; the first scrape on a new machine takes a few minutes because of that download.
+
+Credentials are the only manual step, and only if Threads shows a login wall. They live in
+a `.env` file next to the data root reported by `narxoz_threads_status`
+(`~/.narxoz-threads/.env` for a standalone install):
+
+```
+THREADS_USERNAME=...
+THREADS_PASSWORD=...
 ```
 
-## After a scrape
+or `THREADS_ACCESS_TOKEN=...` to use the official API instead. Never ask the user to type
+credentials into the chat — have them edit the file.
 
-1. Prefer last 7 days; mention last 24 hours if any posts exist.
-2. Summarize: author, time, permalink, short quote.
-3. Replies should be shown with their parent question.
-4. Ignore anesthesia false positives (наркоз written as нархоз).
-5. If `found` is 0, report scrape errors instead of guessing.
+To keep data somewhere else, set `NARXOZ_SCRAPER_ROOT` before starting Claude.
 
-## Daily job
+## Workflow
 
-Default time is 09:00 in `config.json` (`Asia/Almaty`). That path is the Python/Windows task, not Claude.
+1. `scrape_narxoz_threads`
+2. On a login error, `login_narxoz_threads`, then retry once
+3. `latest_narxoz_threads` with `hours: 168`, and again with `hours: 24` if there is a week's worth
+
+## Reporting
+
+Prefer the last 7 days, and call out the last 24 hours separately when there is anything.
+Give author, date, link, and a one-line gist per post. Show replies with the parent question
+they answer. Ignore anesthesia false positives (наркоз matched as нархоз).

@@ -4609,7 +4609,7 @@ var require_core = __commonJS({
       errorsText(errors = this.errors, { separator = ", ", dataVar = "data" } = {}) {
         if (!errors || errors.length === 0)
           return "No errors";
-        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text, msg) => text + separator + msg);
+        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text2, msg) => text2 + separator + msg);
       }
       $dataMetaSchema(metaSchema, keywordsJsonPointers) {
         const rules = this.RULES.all;
@@ -21420,26 +21420,31 @@ var StdioServerTransport = class {
   }
 };
 
+// src/index.ts
+import { existsSync as existsSync7 } from "node:fs";
+
 // src/posts.ts
 import { existsSync as existsSync2, readFileSync } from "node:fs";
 
 // src/repo.ts
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-function scraperRoot() {
-  const fromEnv = process.env.NARXOZ_SCRAPER_ROOT?.trim();
-  if (fromEnv && existsSync(join(fromEnv, "pyproject.toml"))) {
-    return resolve(fromEnv);
-  }
-  const here = dirname(fileURLToPath(import.meta.url));
-  const bundled = resolve(here, "..", "..", "..");
+function homeRoot() {
+  return join(homedir(), ".narxoz-threads");
+}
+function pluginRoot() {
+  return resolve(dirname(fileURLToPath(import.meta.url)), "..");
+}
+function repoCheckout() {
+  const bundled = resolve(pluginRoot(), "..", "..");
   if (existsSync(join(bundled, "pyproject.toml"))) {
     return bundled;
   }
   let dir = process.cwd();
   for (let i = 0; i < 8; i += 1) {
-    if (existsSync(join(dir, "pyproject.toml"))) {
+    if (existsSync(join(dir, "pyproject.toml")) && existsSync(join(dir, "socnetscraper"))) {
       return dir;
     }
     const parent = dirname(dir);
@@ -21448,9 +21453,22 @@ function scraperRoot() {
     }
     dir = parent;
   }
-  throw new Error(
-    "Cannot find SocNetScraper. Set NARXOZ_SCRAPER_ROOT to the repo path."
-  );
+  return void 0;
+}
+function scraperRoot() {
+  const fromEnv = process.env.NARXOZ_SCRAPER_ROOT?.trim();
+  if (fromEnv) {
+    const root = resolve(fromEnv);
+    mkdirSync(root, { recursive: true });
+    return root;
+  }
+  const checkout = repoCheckout();
+  if (checkout) {
+    return checkout;
+  }
+  const home = homeRoot();
+  mkdirSync(home, { recursive: true });
+  return home;
 }
 function postsPath(root) {
   return join(root, "data", "posts.jsonl");
@@ -21516,7 +21534,7 @@ function recentPosts(root, hours, limit) {
 }
 
 // src/scraper/config.ts
-import { existsSync as existsSync3, mkdirSync, readFileSync as readFileSync2 } from "node:fs";
+import { existsSync as existsSync3, mkdirSync as mkdirSync2, readFileSync as readFileSync2, writeFileSync } from "node:fs";
 import { join as join2 } from "node:path";
 var DEFAULTS = {
   keywords: ["\u043D\u0430\u0440\u0445\u043E\u0437", "narxoz"],
@@ -21530,8 +21548,20 @@ var DEFAULTS = {
   headless: true,
   search_filters: ["recent", "default"]
 };
+function envFiles(root) {
+  const files = [join2(root, ".env")];
+  const home = join2(homeRoot(), ".env");
+  if (!files.includes(home)) {
+    files.push(home);
+  }
+  return files;
+}
 function loadDotEnv(root) {
-  const file = join2(root, ".env");
+  for (const file of envFiles(root)) {
+    readDotEnvFile(file);
+  }
+}
+function readDotEnvFile(file) {
   if (!existsSync3(file)) {
     return;
   }
@@ -21549,16 +21579,16 @@ function loadDotEnv(root) {
     if (value.startsWith('"') && value.endsWith('"') || value.startsWith("'") && value.endsWith("'")) {
       value = value.slice(1, -1);
     }
-    if (!(key2 in process.env)) {
+    if (!process.env[key2]?.trim()) {
       process.env[key2] = value;
     }
   }
 }
 function paths(root = scraperRoot()) {
   const data = join2(root, "data");
-  mkdirSync(data, { recursive: true });
-  mkdirSync(join2(root, "logs"), { recursive: true });
-  mkdirSync(join2(data, "runs"), { recursive: true });
+  mkdirSync2(data, { recursive: true });
+  mkdirSync2(join2(root, "logs"), { recursive: true });
+  mkdirSync2(join2(data, "runs"), { recursive: true });
   return {
     root,
     data,
@@ -21576,6 +21606,8 @@ function loadConfig(root = scraperRoot()) {
   const file = paths(root).config;
   if (existsSync3(file)) {
     Object.assign(cfg, JSON.parse(readFileSync2(file, "utf8")));
+  } else {
+    writeFileSync(file, JSON.stringify(DEFAULTS, null, 2) + "\n", "utf8");
   }
   return cfg;
 }
@@ -21605,8 +21637,118 @@ function threadsCredentials() {
 }
 
 // src/scraper/browser.ts
-import { existsSync as existsSync4, readdirSync } from "node:fs";
-import { chromium } from "playwright";
+import { existsSync as existsSync5, readdirSync } from "node:fs";
+import { join as join4 } from "node:path";
+
+// src/scraper/playwright.ts
+import { spawnSync } from "node:child_process";
+import { existsSync as existsSync4, rmSync, statSync, writeFileSync as writeFileSync2 } from "node:fs";
+import { join as join3 } from "node:path";
+var cached2;
+var STALE_MS = 5 * 60 * 1e3;
+var WAIT_MS = 12 * 60 * 1e3;
+function lockFile() {
+  return join3(pluginRoot(), ".deps-lock");
+}
+function lockHeld() {
+  try {
+    return Date.now() - statSync(lockFile()).mtimeMs < STALE_MS;
+  } catch {
+    return false;
+  }
+}
+var sleep = (ms) => new Promise((resolve2) => setTimeout(resolve2, ms));
+async function waitForBackgroundInstall() {
+  if (!lockHeld()) {
+    return void 0;
+  }
+  process.stderr.write("[narxoz-threads] waiting for the background Playwright install\n");
+  const deadline = Date.now() + WAIT_MS;
+  while (Date.now() < deadline && lockHeld()) {
+    await sleep(3e3);
+  }
+  return importChromium();
+}
+function run(command, args) {
+  process.stderr.write(`[narxoz-threads] ${command} ${args.join(" ")}
+`);
+  const result = spawnSync(command, args, {
+    cwd: pluginRoot(),
+    stdio: ["ignore", "pipe", "pipe"],
+    shell: true,
+    env: { ...process.env, npm_config_yes: "true" }
+  });
+  const output = `${result.stdout ?? ""}${result.stderr ?? ""}`.trim();
+  if (output) {
+    process.stderr.write(`${output}
+`);
+  }
+  return { ok: result.status === 0, output };
+}
+async function importChromium() {
+  try {
+    const playwright = await import("playwright");
+    return playwright.chromium;
+  } catch {
+    return void 0;
+  }
+}
+function installMessage(detail) {
+  return [
+    "Playwright could not be installed automatically.",
+    `Run this once, then retry: cd "${pluginRoot()}" && npm install`,
+    detail
+  ].filter(Boolean).join("\n");
+}
+function chromiumInstalled(chromium) {
+  try {
+    return existsSync4(chromium.executablePath());
+  } catch {
+    return false;
+  }
+}
+async function getChromium() {
+  if (cached2) {
+    return cached2;
+  }
+  let chromium = await importChromium() ?? await waitForBackgroundInstall();
+  if (!chromium) {
+    if (!existsSync4(join3(pluginRoot(), "package.json"))) {
+      throw new Error(installMessage("No package.json next to the plugin server."));
+    }
+    writeFileSync2(lockFile(), String(process.pid), "utf8");
+    let install;
+    try {
+      install = run("npm", ["install", "--omit=dev", "--no-audit", "--no-fund"]);
+    } finally {
+      rmSync(lockFile(), { force: true });
+    }
+    chromium = await importChromium();
+    if (!chromium) {
+      throw new Error(installMessage(install.output.slice(-800)));
+    }
+  }
+  if (!chromiumInstalled(chromium)) {
+    writeFileSync2(lockFile(), String(process.pid), "utf8");
+    let browsers;
+    try {
+      browsers = run("npx", ["--no-install", "playwright", "install", "chromium"]);
+    } finally {
+      rmSync(lockFile(), { force: true });
+    }
+    if (!chromiumInstalled(chromium)) {
+      throw new Error(
+        [
+          "Playwright is installed but its Chromium build is missing.",
+          `Run this once, then retry: cd "${pluginRoot()}" && npx playwright install chromium`,
+          browsers.output.slice(-800)
+        ].filter(Boolean).join("\n")
+      );
+    }
+  }
+  cached2 = chromium;
+  return chromium;
+}
 
 // src/scraper/parse.ts
 var ANESTHESIA = [
@@ -21657,15 +21799,15 @@ function searchUrl(query, filterName) {
   const url = `https://www.threads.com/search?q=${encodeURIComponent(query)}&serp_type=default`;
   return filterName === "recent" ? `${url}&filter=recent` : url;
 }
-function mentionsNarxoz(text, queries) {
-  const blob = (text || "").toLowerCase();
+function mentionsNarxoz(text2, queries) {
+  const blob = (text2 || "").toLowerCase();
   return queries.filter((query) => {
     const needle = query.replace(/^#/, "").toLowerCase();
     return Boolean(needle) && blob.includes(needle);
   });
 }
-function isUniversityMention(text, username, queries) {
-  const hits = mentionsNarxoz(text, queries);
+function isUniversityMention(text2, username, queries) {
+  const hits = mentionsNarxoz(text2, queries);
   if (!hits.length) {
     return [];
   }
@@ -21673,7 +21815,7 @@ function isUniversityMention(text, username, queries) {
   if (user.includes("narxoz") || user.includes("\u043D\u0430\u0440\u0445\u043E\u0437")) {
     return hits;
   }
-  const blob = (text || "").toLowerCase();
+  const blob = (text2 || "").toLowerCase();
   if (UNIVERSITY.some((word) => blob.includes(word))) {
     return hits;
   }
@@ -21812,14 +21954,14 @@ function parsePost(item, query, source) {
   const user = post.user && typeof post.user === "object" ? post.user : {};
   const code = post.code;
   const username = String(user.username || post.username || "");
-  const text = String(caption.text || post.text || "");
+  const text2 = String(caption.text || post.text || "");
   const publishedAt = fromUnix(post.taken_at) || post.published_at;
   const threadsInfo = post.text_post_app_info;
   const isThreads = Boolean(threadsInfo && typeof threadsInfo === "object") || Boolean(post.taken_at);
   if (!isThreads || !publishedAt) {
     return void 0;
   }
-  if (!code && !text) {
+  if (!code && !text2) {
     return void 0;
   }
   const reply = threadsInfo && typeof threadsInfo === "object" ? threadsInfo : {};
@@ -21841,7 +21983,7 @@ function parsePost(item, query, source) {
     verified: Boolean(user.is_verified),
     avatar_url: avatarUrl(user),
     image_urls: imageUrls(post),
-    text,
+    text: text2,
     published_at: publishedAt,
     like_count: post.like_count,
     reply_count: asInt(reply.direct_reply_count || rec.view_replies_cta_string),
@@ -22013,13 +22155,14 @@ var LoginRequired = class extends Error {
 };
 async function openContext(root, headless) {
   const loc = paths(root);
+  const chromium = await getChromium();
   const launch = {
     headless,
     viewport: { width: 1280, height: 900 },
     userAgent: USER_AGENT,
     locale: "ru-RU"
   };
-  if (existsSync4(loc.browserProfile) && readdirSync(loc.browserProfile).length) {
+  if (existsSync5(loc.browserProfile) && readdirSync(loc.browserProfile).length) {
     const context2 = await chromium.launchPersistentContext(loc.browserProfile, launch);
     return { context: context2 };
   }
@@ -22028,7 +22171,7 @@ async function openContext(root, headless) {
     viewport: launch.viewport,
     userAgent: USER_AGENT,
     locale: "ru-RU",
-    storageState: existsSync4(loc.storageState) ? loc.storageState : void 0
+    storageState: existsSync5(loc.storageState) ? loc.storageState : void 0
   });
   return { context, browser };
 }
@@ -22085,9 +22228,12 @@ async function loginWithEnv(page, username, password) {
 async function saveLoginSession(root) {
   const creds = threadsCredentials();
   if (!creds) {
-    throw new LoginRequired("Set THREADS_USERNAME and THREADS_PASSWORD in .env, then login again.");
+    throw new LoginRequired(
+      `Set THREADS_USERNAME and THREADS_PASSWORD in ${join4(root, ".env")}, then login again.`
+    );
   }
   const loc = paths(root);
+  const chromium = await getChromium();
   const context = await chromium.launchPersistentContext(loc.browserProfile, {
     headless: false,
     viewport: { width: 1280, height: 900 },
@@ -22242,15 +22388,15 @@ async function searchKeyword(token, query, limit, hours) {
 }
 
 // src/scraper/store.ts
-import { existsSync as existsSync5, mkdirSync as mkdirSync2, readFileSync as readFileSync3, writeFileSync } from "node:fs";
-import { join as join3 } from "node:path";
+import { existsSync as existsSync6, mkdirSync as mkdirSync3, readFileSync as readFileSync3, writeFileSync as writeFileSync3 } from "node:fs";
+import { join as join5 } from "node:path";
 function key(post) {
   return String(post.id || post.code || post.url || "");
 }
 function loadExisting(root) {
   const file = paths(root).postsJsonl;
   const posts = {};
-  if (!existsSync5(file)) {
+  if (!existsSync6(file)) {
     return posts;
   }
   for (const line of readFileSync3(file, "utf8").split(/\r?\n/)) {
@@ -22295,8 +22441,8 @@ function mergePosts(existing, incoming) {
 }
 function savePosts(root, posts) {
   const { postsJsonl, postsCsv, data } = paths(root);
-  mkdirSync2(data, { recursive: true });
-  writeFileSync(
+  mkdirSync3(data, { recursive: true });
+  writeFileSync3(
     postsJsonl,
     posts.map((post) => JSON.stringify(post)).join("\n") + (posts.length ? "\n" : ""),
     "utf8"
@@ -22321,12 +22467,12 @@ function savePosts(root, posts) {
       (post) => fields.map((field) => `"${String(post[field] ?? "").replace(/"/g, '""')}"`).join(",")
     )
   ];
-  writeFileSync(postsCsv, rows.join("\n"), "utf8");
+  writeFileSync3(postsCsv, rows.join("\n"), "utf8");
 }
 function saveRun(root, summary) {
   const stamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
-  const file = join3(paths(root).runs, `${stamp}.json`);
-  writeFileSync(file, JSON.stringify(summary, null, 2), "utf8");
+  const file = join5(paths(root).runs, `${stamp}.json`);
+  writeFileSync3(file, JSON.stringify(summary, null, 2), "utf8");
   return file;
 }
 function lookbackPosts(posts, hours) {
@@ -22429,16 +22575,24 @@ async function scrapeOnce(root, forceBrowser = false) {
 // src/index.ts
 var server = new McpServer({
   name: "narxoz-threads",
-  version: "0.2.0"
+  version: "0.3.0"
+});
+var text = (value) => ({ content: [{ type: "text", text: value }] });
+var failure = (err) => ({
+  content: [{ type: "text", text: err instanceof Error ? err.message : String(err) }],
+  isError: true
 });
 server.tool(
   "scrape_narxoz_threads",
   "Scrape public Threads posts about Narxoz / \u043D\u0430\u0440\u0445\u043E\u0437 using the TypeScript engine (no Python).",
   { browser: external_exports.boolean().optional().describe("Skip the official API and use the browser session") },
   async ({ browser }) => {
-    const root = scraperRoot();
-    const summary = await scrapeOnce(root, Boolean(browser));
-    return { content: [{ type: "text", text: JSON.stringify(summary, null, 2) }] };
+    try {
+      const summary = await scrapeOnce(scraperRoot(), Boolean(browser));
+      return text(JSON.stringify(summary, null, 2));
+    } catch (err) {
+      return failure(err);
+    }
   }
 );
 server.tool(
@@ -22446,10 +22600,42 @@ server.tool(
   "Open a browser and save a Threads/Instagram login session from .env credentials.",
   {},
   async () => {
+    try {
+      const root = scraperRoot();
+      loadConfig(root);
+      return text(`Saved session to ${await saveLoginSession(root)}`);
+    } catch (err) {
+      return failure(err);
+    }
+  }
+);
+server.tool(
+  "narxoz_threads_status",
+  "Report where the plugin stores data, which credentials it found, and whether it is ready to scrape.",
+  {},
+  async () => {
     const root = scraperRoot();
-    loadConfig(root);
-    const path = await saveLoginSession(root);
-    return { content: [{ type: "text", text: `Saved session to ${path}` }] };
+    const cfg = loadConfig(root);
+    const loc = paths(root);
+    return text(
+      JSON.stringify(
+        {
+          data_root: root,
+          plugin_root: pluginRoot(),
+          config_file: loc.config,
+          posts_file: loc.postsJsonl,
+          env_files: envFiles(root).map((file) => ({ path: file, exists: existsSync7(file) })),
+          playwright_installed: existsSync7(`${pluginRoot()}/node_modules/playwright/package.json`),
+          has_saved_session: existsSync7(loc.storageState) || existsSync7(loc.browserProfile),
+          has_api_token: Boolean(apiToken()),
+          has_login_credentials: Boolean(threadsCredentials()),
+          queries: searchQueries(cfg),
+          posts_collected: existsSync7(loc.postsJsonl)
+        },
+        null,
+        2
+      )
+    );
   }
 );
 server.tool(

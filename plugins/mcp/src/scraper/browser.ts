@@ -1,6 +1,8 @@
 import { existsSync, readdirSync } from "node:fs";
-import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
+import { join } from "node:path";
+import type { Browser, BrowserContext, Page } from "playwright";
 import { paths, threadsCredentials, type AppConfig } from "./config.js";
+import { getChromium } from "./playwright.js";
 import {
   ingestPayload,
   parentCard,
@@ -21,6 +23,7 @@ async function openContext(
   headless: boolean
 ): Promise<{ context: BrowserContext; browser?: Browser }> {
   const loc = paths(root);
+  const chromium = await getChromium();
   const launch = {
     headless,
     viewport: { width: 1280, height: 900 },
@@ -99,9 +102,12 @@ async function loginWithEnv(page: Page, username: string, password: string): Pro
 export async function saveLoginSession(root: string): Promise<string> {
   const creds = threadsCredentials();
   if (!creds) {
-    throw new LoginRequired("Set THREADS_USERNAME and THREADS_PASSWORD in .env, then login again.");
+    throw new LoginRequired(
+      `Set THREADS_USERNAME and THREADS_PASSWORD in ${join(root, ".env")}, then login again.`
+    );
   }
   const loc = paths(root);
+  const chromium = await getChromium();
   const context = await chromium.launchPersistentContext(loc.browserProfile, {
     headless: false,
     viewport: { width: 1280, height: 900 },

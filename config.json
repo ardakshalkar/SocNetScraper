@@ -1,0 +1,12 @@
+{
+  "keywords": ["нархоз", "narxoz"],
+  "hashtags": ["narxoz", "нархоз"],
+  "timezone": "Asia/Almaty",
+  "daily_time": "09:00",
+  "lookback_hours": 24,
+  "week_hours": 168,
+  "max_scrolls": 10,
+  "max_posts_per_query": 80,
+  "headless": true,
+  "search_filters": ["recent", "default"]
+}

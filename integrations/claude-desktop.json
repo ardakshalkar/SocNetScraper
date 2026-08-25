@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "narxoz-threads": {
+      "command": "python",
+      "args": ["-m", "socnetscraper.mcp_server"],
+      "cwd": "REPLACE_WITH_REPO_PATH"
+    }
+  }
+}

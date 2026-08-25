@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "narxoz-threads": {
+      "command": "python",
+      "args": ["-m", "socnetscraper.mcp_server"]
+    }
+  }
+}

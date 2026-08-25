@@ -15,5 +15,7 @@ data/browser_profile/
 data/media/
 logs/
 *.egg-info/
-dist/
+/dist/
+plugins/mcp/dist/
 build/
+node_modules/

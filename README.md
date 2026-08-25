@@ -60,23 +60,40 @@ Pick one:
 3. **Keep a process running** — `python -m socnetscraper daily --now`
 4. **Linux/macOS cron** — `0 9 * * * cd /path/to/SocNetScraper && .venv/bin/python -m socnetscraper scrape`
 
-## Include in Claude
+## Include in Claude or Codex
 
-**Claude Code / Claude Project**
+TypeScript plugins live in `plugins/`. The **Claude plugin does not need Python**; it scrapes with Node and Playwright.
 
-- This repo already has `CLAUDE.md` and `.claude/skills/scrape-threads-narxoz/SKILL.md`.
-- Copy `skills/scrape-threads-narxoz/` into another project's `.claude/skills/` folder if you want the same behavior elsewhere.
+```bash
+cd plugins/mcp && npm install && npx playwright install chromium && npm run build
+cd ../claude && npm install
+```
 
-**Claude Desktop MCP**
+See `plugins/README.md`.
 
-Merge `integrations/claude-desktop.json` into Claude Desktop config (`claude_desktop_config.json`). Set `cwd` to this repo and use the venv Python if you have one:
+**Claude Code plugin**
+
+```text
+/plugin marketplace add ardakshalkar/SocNetScraper
+/plugin install narxoz-threads@narxoz-threads-marketplace
+```
+
+This repo also still has `CLAUDE.md` and `.claude/skills/scrape-threads-narxoz/SKILL.md` if you open the project without installing the plugin.
+
+**Codex plugin**
+
+Install `plugins/codex` (it has `.codex-plugin/plugin.json`). Node 18+ must be on PATH.
+
+**Claude Desktop MCP (Node, no Python)**
+
+Merge `integrations/claude-desktop.json` into Claude Desktop config (`claude_desktop_config.json`). Point `args` at the built server and `cwd` at this repo:
 
 ```json
 {
   "mcpServers": {
     "narxoz-threads": {
-      "command": "C:/path/to/SocNetScraper/.venv/Scripts/python.exe",
-      "args": ["-m", "socnetscraper.mcp_server"],
+      "command": "node",
+      "args": ["C:/path/to/SocNetScraper/plugins/claude/server/index.js"],
       "cwd": "C:/path/to/SocNetScraper"
     }
   }
@@ -86,7 +103,9 @@ Merge `integrations/claude-desktop.json` into Claude Desktop config (`claude_des
 Tools Claude gets:
 
 - `scrape_narxoz_threads`
+- `login_narxoz_threads`
 - `latest_narxoz_threads`
+- `narxoz_threads_data_path`
 
 ## Official API vs browser
 

@@ -1,44 +1,34 @@
 ---
 name: scrape-threads-narxoz
-description: Scrapes public Threads posts about Narxoz University using the local socnetscraper CLI or MCP tools. Use when the user asks for Threads mentions of нархоз or narxoz, a daily Narxoz social listening run, or to summarize collected Threads posts.
+description: Scrapes public Threads posts about Narxoz University with the TypeScript MCP tools (no Python). Use when the user asks for Threads mentions of нархоз or narxoz, a daily Narxoz social listening run, or to summarize collected Threads posts.
 ---
 
 # Scrape Threads for Narxoz
 
-Collect public Threads posts that mention **нархоз** or **narxoz**. Prefer the local package in this repo; do not invent a new scraper.
+Collect public Threads posts that mention **нархоз** or **narxoz**. Use this repo's MCP tools. Do **not** call Python. Do not invent a second scraper.
 
-## Run
+## Tools
 
-From the repo root:
+- `scrape_narxoz_threads` — collect posts (`browser: true` skips the official API)
+- `login_narxoz_threads` — save a Threads session from `.env` (`THREADS_USERNAME` / `THREADS_PASSWORD`)
+- `latest_narxoz_threads` — read saved posts (`hours: 168` or `24`)
+- `narxoz_threads_data_path` — path to `data/posts.jsonl`
+
+If MCP is not connected, tell the user to install Node 18+, then:
 
 ```bash
-python -m socnetscraper scrape
+cd plugins/mcp && npm install && npm run build
+cd ../claude && npm install
 ```
-
-If Threads shows a login wall:
-
-```bash
-python -m socnetscraper login
-python -m socnetscraper scrape --browser
-```
-
-If `THREADS_ACCESS_TOKEN` is set, the official Keyword Search API is used first.
 
 ## After a scrape
 
-1. Prefer posts from the last 7 days by default, with a last-24-hours filter.
-2. Open or regenerate the HTML dashboard with `python -m socnetscraper view`.
-3. Summarize new posts: author, time, permalink, short quote.
-4. If last-24h is empty, say so and show last 7 days instead.
-5. If `found` is 0, report `data/runs/*.json` errors instead of guessing.
-
-## MCP
-
-If the `narxoz-threads` MCP server is connected, use:
-
-- `scrape_narxoz_threads` to run a collection
-- `latest_narxoz_threads` to read saved posts
+1. Prefer last 7 days; mention last 24 hours if any posts exist.
+2. Summarize: author, time, permalink, short quote.
+3. Replies should be shown with their parent question.
+4. Ignore anesthesia false positives (наркоз written as нархоз).
+5. If `found` is 0, report scrape errors instead of guessing.
 
 ## Daily job
 
-Default time is 09:00 in `config.json` (`Asia/Almaty`). Change `daily_time` there, then use GitHub Actions, `python -m socnetscraper daily --now`, or `scripts/install-windows-task.ps1`.
+Default time is 09:00 in `config.json` (`Asia/Almaty`). That path is the Python/Windows task, not Claude.

@@ -1,0 +1,11 @@
+{
+  "name": "narxoz-threads-codex-plugin",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "postinstall": "playwright install chromium"
+  },
+  "dependencies": {
+    "playwright": "^1.49.0"
+  }
+}

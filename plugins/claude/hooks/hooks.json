@@ -1,0 +1,15 @@
+{
+  "description": "Install Node Playwright once so Claude can scrape without Python.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/ensure-deps.mjs\""
+          }
+        ]
+      }
+    ]
+  }
+}

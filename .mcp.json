@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "narxoz-threads": {
-      "command": "python",
-      "args": ["-m", "socnetscraper.mcp_server"]
+      "command": "node",
+      "args": ["plugins/claude/server/index.js"]
     }
   }
 }
